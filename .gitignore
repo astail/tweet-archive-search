@@ -1,0 +1,8 @@
+.env
+web/config.js
+data/archive/*
+!data/archive/.gitkeep
+web/media/*
+!web/media/.gitkeep
+__pycache__/
+*.pyc

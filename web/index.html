@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tweet Archive Search</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --accent: #1d9bf0;
+    --border: color-mix(in srgb, CanvasText 14%, transparent);
+    --border-strong: color-mix(in srgb, CanvasText 28%, transparent);
+    --muted: color-mix(in srgb, CanvasText 55%, transparent);
+    --hover: color-mix(in srgb, CanvasText 5%, transparent);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 0 4rem;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  /* header: profile strip */
+  .profile-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: Canvas;
+    z-index: 5;
+  }
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+  .profile-names { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .display-name { font-weight: 700; font-size: 0.95rem; }
+  .handle { font-size: 0.85rem; color: var(--muted); }
+  .archive-label { margin-left: auto; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+  /* search bar */
+  .search-wrap { padding: 0.75rem 1rem 0.5rem; }
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: color-mix(in srgb, CanvasText 6%, transparent);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.55rem 0.9rem;
+  }
+  .search-bar:focus-within {
+    background: Canvas;
+    border-color: var(--accent);
+  }
+  .search-bar svg { flex-shrink: 0; opacity: 0.6; width: 18px; height: 18px; }
+  input[type="search"] {
+    flex: 1;
+    font-size: 0.95rem;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: CanvasText;
+  }
+  input[type="search"]::-webkit-search-cancel-button { display: none; }
+
+  /* filter panel */
+  .filters {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 0.6rem 1rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .filter-row { display: flex; align-items: center; gap: 1.1rem; flex-wrap: wrap; }
+  .filter-group-label { color: var(--muted); margin-right: 0.2rem; }
+  .pill-group { display: flex; gap: 0.35rem; }
+  .pill {
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--muted);
+  }
+  .pill.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .filters label.checkbox { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); cursor: pointer; }
+  .date-range { display: flex; align-items: center; gap: 0.4rem; }
+  .date-range input[type="date"] {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.4rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  #status { font-size: 0.78rem; color: var(--muted); padding: 0.6rem 1rem 0.2rem; min-height: 1em; }
+  #results { padding: 0 0; }
+
+  /* tweet card */
+  .tweet {
+    display: flex;
+    gap: 0.7rem;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .tweet:hover { background: var(--hover); }
+  .tweet .avatar { width: 40px; height: 40px; font-size: 0.9rem; }
+  .tweet-body { flex: 1; min-width: 0; }
+  .tweet-head { display: flex; align-items: baseline; gap: 0.35rem; flex-wrap: wrap; font-size: 0.9rem; }
+  .tweet-head .display-name { font-size: 0.9rem; }
+  .tweet-head .handle { font-size: 0.85rem; }
+  .tweet-head .dot { color: var(--muted); }
+  .tweet-head .date { color: var(--muted); font-size: 0.85rem; }
+  .tweet-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; margin: 0.15rem 0 0.4rem; font-size: 0.95rem; }
+  .tweet-text em { font-style: normal; background: color-mix(in srgb, gold 45%, transparent); border-radius: 3px; padding: 0 2px; }
+  .tweet-actions { display: flex; gap: 1.5rem; margin-top: 0.35rem; }
+  .tweet-actions .action { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.82rem; }
+  .tweet-actions svg { width: 17px; height: 17px; }
+  .tweet-actions a.action { text-decoration: none; }
+  .tweet-actions a.action:hover { color: var(--accent); }
+  .hashtags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem; }
+  .hashtag { font-size: 0.85rem; color: var(--accent); }
+
+  .tweet-media {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    margin-top: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .tweet-media.single { grid-template-columns: 1fr; }
+  .tweet-media img, .tweet-media video {
+    width: 100%;
+    height: 100%;
+    max-height: 380px;
+    object-fit: cover;
+    display: block;
+    background: color-mix(in srgb, CanvasText 8%, transparent);
+  }
+  .tweet-media.single img, .tweet-media.single video { max-height: 460px; object-fit: contain; }
+
+  #setup-notice {
+    display: none;
+    border: 1px solid color-mix(in srgb, orange 50%, transparent);
+    background: color-mix(in srgb, orange 12%, transparent);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    font-size: 0.85rem;
+    margin: 1rem;
+  }
+  #empty-state { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 3rem 1rem; }
+</style>
+</head>
+<body>
+
+  <div id="setup-notice">
+    <code>web/config.js</code> が見つかりません。<code>uv run scripts/write_web_config.py</code> を実行してください。
+  </div>
+
+  <div class="profile-bar">
+    <div class="avatar" id="avatar">?</div>
+    <div class="profile-names">
+      <span class="display-name" id="display-name">Tweet Archive</span>
+      <span class="handle" id="handle"></span>
+    </div>
+    <span class="archive-label">アーカイブ検索</span>
+  </div>
+
+  <div class="search-wrap">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></svg>
+      <input type="search" id="q" placeholder="ツイートを検索" autofocus>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="filter-row">
+      <span class="filter-group-label">並び替え</span>
+      <div class="pill-group" id="sort-pills">
+        <span class="pill active" data-sort="relevance">関連度</span>
+        <span class="pill" data-sort="newest">新しい順</span>
+        <span class="pill" data-sort="oldest">古い順</span>
+        <span class="pill" data-sort="likes">いいね数順</span>
+      </div>
+    </div>
+    <div class="filter-row">
+      <label class="checkbox"><input type="checkbox" id="exclude-rt"> リツイートを除外</label>
+    </div>
+    <div class="filter-row">
+      <div class="date-range">
+        <span class="filter-group-label">次の日付以降</span>
+        <input type="date" id="date-from">
+      </div>
+      <div class="date-range">
+        <span class="filter-group-label">次の日付以前</span>
+        <input type="date" id="date-to">
+      </div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+  <div id="results"></div>
+
+<script src="config.js"></script>
+<script>
+const configReady = typeof MEILI_PORT !== "undefined" && typeof MEILI_SEARCH_KEY !== "undefined";
+if (!configReady) {
+  document.getElementById("setup-notice").style.display = "block";
+}
+// Meilisearch is always reachable on the same host this page was loaded
+// from (localhost, a LAN IP, ...), just on a different port.
+const MEILI_HOST = configReady ? `http://${window.location.hostname}:${MEILI_PORT}` : null;
+
+if (configReady && typeof ARCHIVE_DISPLAY_NAME === "string" && ARCHIVE_DISPLAY_NAME) {
+  document.getElementById("display-name").textContent = ARCHIVE_DISPLAY_NAME;
+  document.getElementById("avatar").textContent = ARCHIVE_DISPLAY_NAME.trim()[0].toUpperCase();
+}
+if (configReady && typeof ARCHIVE_USERNAME === "string" && ARCHIVE_USERNAME) {
+  document.getElementById("handle").textContent = `@${ARCHIVE_USERNAME}`;
+}
+
+const qInput = document.getElementById("q");
+const sortPills = document.getElementById("sort-pills");
+const excludeRt = document.getElementById("exclude-rt");
+const dateFrom = document.getElementById("date-from");
+const dateTo = document.getElementById("date-to");
+const resultsEl = document.getElementById("results");
+const statusEl = document.getElementById("status");
+
+let currentSort = "relevance";
+let debounceTimer = null;
+
+function renderMedia(media) {
+  if (!media || !media.length) return "";
+  const items = media.map(m => {
+    const src = `/media/${encodeURIComponent(m.filename)}`;
+    if (m.type === "photo") {
+      return `<img src="${src}" loading="lazy" alt="">`;
+    }
+    // video and animated_gif are both stored as mp4 in the archive
+    return `<video src="${src}" controls preload="metadata" ${m.type === "animated_gif" ? "loop muted" : ""}></video>`;
+  }).join("");
+  const cls = media.length === 1 ? "tweet-media single" : "tweet-media";
+  return `<div class="${cls}">${items}</div>`;
+}
+
+const HEART_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 6.926 6.4 3.668-2.13 5.85-4.43 6.926-6.4 1.111-2.04 1.03-3.7.48-4.82-.561-1.13-1.666-1.84-2.908-1.91z"></path></svg>';
+const RETWEET_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"></path></svg>';
+const LINK_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.36 5.64c-1.95-1.96-5.11-1.96-7.07 0L9.88 7.05 8.46 5.64l1.42-1.42c2.73-2.73 7.16-2.73 9.9 0 2.73 2.74 2.73 7.17 0 9.9l-1.42 1.42-1.41-1.42 1.41-1.41c1.96-1.96 1.96-5.12 0-7.07zm-2.12 3.53l-7.07 7.07-1.41-1.41 7.07-7.07 1.41 1.41zm-12.02.71l1.42-1.42 1.41 1.42-1.41 1.41c-1.96 1.96-1.96 5.12 0 7.07 1.95 1.96 5.11 1.96 7.07 0l1.41-1.41 1.42 1.41-1.42 1.42c-2.73 2.73-7.16 2.73-9.9 0-2.73-2.74-2.73-7.17 0-9.9z"></path></svg>';
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+// Meilisearch's highlight markers are plain <em>...</em>; escape everything
+// else, then re-enable just those tags.
+function renderHighlighted(formatted) {
+  const escaped = escapeHtml(formatted);
+  return escaped
+    .replaceAll("&lt;em&gt;", "<em>")
+    .replaceAll("&lt;/em&gt;", "</em>");
+}
+
+function buildFilter() {
+  const clauses = [];
+  if (excludeRt.checked) clauses.push("is_retweet = false");
+  if (dateFrom.value) {
+    const ts = Math.floor(new Date(dateFrom.value + "T00:00:00").getTime() / 1000);
+    clauses.push(`created_at_ts >= ${ts}`);
+  }
+  if (dateTo.value) {
+    const ts = Math.floor(new Date(dateTo.value + "T23:59:59").getTime() / 1000);
+    clauses.push(`created_at_ts <= ${ts}`);
+  }
+  return clauses.length ? clauses.join(" AND ") : undefined;
+}
+
+async function runSearch() {
+  if (!configReady) return;
+  const query = qInput.value.trim();
+  if (!query) {
+    resultsEl.innerHTML = "";
+    statusEl.textContent = "";
+    return;
+  }
+
+  const params = {
+    q: query,
+    limit: 30,
+    attributesToHighlight: ["full_text"],
+  };
+  if (currentSort === "newest") params.sort = ["created_at_ts:desc"];
+  if (currentSort === "oldest") params.sort = ["created_at_ts:asc"];
+  if (currentSort === "likes") params.sort = ["favorite_count:desc"];
+  const filter = buildFilter();
+  if (filter) params.filter = filter;
+
+  statusEl.textContent = "検索中…";
+  let data;
+  try {
+    const res = await fetch(`${MEILI_HOST}/indexes/tweets/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${MEILI_SEARCH_KEY}`,
+      },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    data = await res.json();
+  } catch (err) {
+    statusEl.textContent = `検索エラー: ${err.message}`;
+    resultsEl.innerHTML = "";
+    return;
+  }
+
+  statusEl.textContent = `${data.estimatedTotalHits} 件中 ${data.hits.length} 件を表示 (${data.processingTimeMs}ms)`;
+  resultsEl.innerHTML = data.hits.length
+    ? data.hits.map(renderTweet).join("")
+    : '<div id="empty-state">一致するツイートが見つかりませんでした</div>';
+}
+
+function renderTweet(hit) {
+  const text = renderHighlighted(hit._formatted?.full_text ?? hit.full_text);
+  const date = new Date(hit.created_at_iso).toLocaleString("ja-JP", {
+    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+  const hashtags = (hit.hashtags || [])
+    .map(h => `<span class="hashtag">#${escapeHtml(h)}</span>`)
+    .join("");
+  const displayName = (configReady && ARCHIVE_DISPLAY_NAME) || "Tweet Archive";
+  const username = (configReady && ARCHIVE_USERNAME) || "";
+  const initial = displayName.trim()[0]?.toUpperCase() ?? "?";
+  return `
+    <div class="tweet">
+      <div class="avatar">${escapeHtml(initial)}</div>
+      <div class="tweet-body">
+        <div class="tweet-head">
+          <span class="display-name">${escapeHtml(displayName)}</span>
+          <span class="handle">@${escapeHtml(username)}</span>
+          <span class="dot">·</span>
+          <span class="date">${date}</span>
+        </div>
+        <p class="tweet-text">${text}</p>
+        ${renderMedia(hit.media)}
+        ${hashtags ? `<div class="hashtags">${hashtags}</div>` : ""}
+        <div class="tweet-actions">
+          <span class="action">${RETWEET_ICON} ${hit.retweet_count}</span>
+          <span class="action">${HEART_ICON} ${hit.favorite_count}</span>
+          <a class="action" href="${hit.permalink}" target="_blank" rel="noopener">${LINK_ICON} 開く</a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+qInput.addEventListener("input", () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runSearch, 250);
+});
+sortPills.addEventListener("click", (e) => {
+  const pill = e.target.closest(".pill");
+  if (!pill) return;
+  sortPills.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+  pill.classList.add("active");
+  currentSort = pill.dataset.sort;
+  runSearch();
+});
+excludeRt.addEventListener("change", runSearch);
+dateFrom.addEventListener("change", runSearch);
+dateTo.addEventListener("change", runSearch);
+</script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.50.0
+    container_name: tweet-archive-search-meilisearch
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_ENV: development
+    volumes:
+      - meili_data:/meili_data
+
+  web:
+    image: nginx:alpine
+    container_name: tweet-archive-search-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./data/archive/data/tweets_media:/usr/share/nginx/html/media:ro
+    depends_on:
+      - meilisearch
+
+volumes:
+  meili_data:
