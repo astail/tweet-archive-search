@@ -249,6 +249,10 @@ const statusEl = document.getElementById("status");
 
 let currentSort = "relevance";
 let debounceTimer = null;
+let currentOffset = 0;
+let totalHits = 0;
+let isLoadingMore = false;
+let searchToken = 0;
 
 function renderMedia(media) {
   if (!media || !media.length) return "";
@@ -299,25 +303,39 @@ function buildFilter() {
 
 async function runSearch() {
   if (!configReady) return;
+  currentOffset = 0;
+  totalHits = 0;
+  const token = ++searchToken;
+  await fetchAndRender(token, true);
+}
+
+async function loadMore() {
+  if (!configReady || isLoadingMore) return;
+  if (currentOffset >= totalHits) return;
+  isLoadingMore = true;
+  await fetchAndRender(searchToken, false);
+  isLoadingMore = false;
+}
+
+async function fetchAndRender(token, reset) {
   const query = qInput.value.trim();
-  if (!query) {
-    resultsEl.innerHTML = "";
-    statusEl.textContent = "";
-    return;
-  }
 
   const params = {
     q: query,
-    limit: 30,
+    limit: query ? 30 : 50,
+    offset: currentOffset,
     attributesToHighlight: ["full_text"],
   };
-  if (currentSort === "newest") params.sort = ["created_at_ts:desc"];
-  if (currentSort === "oldest") params.sort = ["created_at_ts:asc"];
-  if (currentSort === "likes") params.sort = ["favorite_count:desc"];
+  // "relevance" only makes sense with a query; browsing with no query falls
+  // back to newest-first so the default view isn't an arbitrary order.
+  const effectiveSort = !query && currentSort === "relevance" ? "newest" : currentSort;
+  if (effectiveSort === "newest") params.sort = ["created_at_ts:desc"];
+  if (effectiveSort === "oldest") params.sort = ["created_at_ts:asc"];
+  if (effectiveSort === "likes") params.sort = ["favorite_count:desc"];
   const filter = buildFilter();
   if (filter) params.filter = filter;
 
-  statusEl.textContent = "検索中…";
+  if (reset) statusEl.textContent = "検索中…";
   let data;
   try {
     const res = await fetch(`${MEILI_HOST}/indexes/tweets/search`, {
@@ -331,15 +349,25 @@ async function runSearch() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     data = await res.json();
   } catch (err) {
+    if (token !== searchToken) return;
     statusEl.textContent = `検索エラー: ${err.message}`;
-    resultsEl.innerHTML = "";
+    if (reset) resultsEl.innerHTML = "";
     return;
   }
+  // A newer search superseded this request (query/sort/filter changed
+  // while this fetch was in flight) — drop the stale response.
+  if (token !== searchToken) return;
 
-  statusEl.textContent = `${data.estimatedTotalHits} 件中 ${data.hits.length} 件を表示 (${data.processingTimeMs}ms)`;
-  resultsEl.innerHTML = data.hits.length
-    ? data.hits.map(renderTweet).join("")
-    : '<div id="empty-state">一致するツイートが見つかりませんでした</div>';
+  totalHits = data.estimatedTotalHits;
+  currentOffset += data.hits.length;
+  statusEl.textContent = `${totalHits} 件中 ${currentOffset} 件を表示 (${data.processingTimeMs}ms)`;
+  if (reset) {
+    resultsEl.innerHTML = data.hits.length
+      ? data.hits.map(renderTweet).join("")
+      : '<div id="empty-state">一致するツイートが見つかりませんでした</div>';
+  } else if (data.hits.length) {
+    resultsEl.insertAdjacentHTML("beforeend", data.hits.map(renderTweet).join(""));
+  }
 }
 
 function renderTweet(hit) {
@@ -391,6 +419,12 @@ sortPills.addEventListener("click", (e) => {
 excludeRt.addEventListener("change", runSearch);
 dateFrom.addEventListener("change", runSearch);
 dateTo.addEventListener("change", runSearch);
+window.addEventListener("scroll", () => {
+  const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 800;
+  if (nearBottom) loadMore();
+});
+
+runSearch();
 </script>
 </body>
 </html>
