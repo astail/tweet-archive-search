@@ -71,7 +71,7 @@
   .search-bar svg { flex-shrink: 0; opacity: 0.6; width: 18px; height: 18px; }
   input[type="search"] {
     flex: 1;
-    font-size: 0.95rem;
+    font-size: 1rem;
     border: none;
     outline: none;
     background: transparent;
@@ -103,7 +103,7 @@
   .filters label.checkbox { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); cursor: pointer; }
   .date-range { display: flex; align-items: center; gap: 0.4rem; }
   .date-range input[type="date"] {
-    font-size: 0.8rem;
+    font-size: 1rem;
     padding: 0.2rem 0.4rem;
     border: 1px solid var(--border-strong);
     border-radius: 6px;
@@ -407,6 +407,11 @@ function renderTweet(hit) {
 qInput.addEventListener("input", () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(runSearch, 250);
+});
+// keydown is more reliable than the "search" event for dismissing the
+// mobile keyboard on Enter/Go/Search across browsers (notably iOS Safari).
+qInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") qInput.blur();
 });
 sortPills.addEventListener("click", (e) => {
   const pill = e.target.closest(".pill");
