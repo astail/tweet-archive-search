@@ -3,7 +3,8 @@
 # ///
 """Extract an X (Twitter) archive .zip's data/ folder into data/archive/data/,
 restart the 'web' container (its tweets_media bind mount can go stale after
-the directory is replaced), then (by default) run ingest.py against it.
+the directory is replaced), then (by default) run ingest.py and, if the
+archive has any like*.js, ingest_likes.py.
 
 Only uses the stdlib, so no uv/pip install needed - just Python 3.11+.
 
@@ -94,6 +95,17 @@ def main():
             cwd=ROOT,
             check=True,
         )
+        if list(TARGET.glob("like*.js")):
+            subprocess.run(
+                [
+                    "docker", "compose", "run", "--rm", "tools",
+                    "python", "scripts/ingest_likes.py", "--archive-dir", "data/archive/data",
+                ],
+                cwd=ROOT,
+                check=True,
+            )
+        else:
+            print("No like*.js found in archive; skipping likes ingest.")
 
 
 if __name__ == "__main__":

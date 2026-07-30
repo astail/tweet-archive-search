@@ -40,9 +40,9 @@ docker compose run --rm tools python scripts/write_web_config.py
    ```bash
    python3 scripts/extract_archive.py path/to/twitter-archive.zip
    ```
-   （このスクリプトはstdlibのみで完結するので直接`python3`で実行できる。内部でzip展開後に`docker compose restart web`と`docker compose run --rm tools python scripts/ingest.py`を呼ぶ。）
+   （このスクリプトはstdlibのみで完結するので直接`python3`で実行できる。内部でzip展開後に`docker compose restart web`、`docker compose run --rm tools python scripts/ingest.py`、（`like*.js`があれば）`scripts/ingest_likes.py`を呼ぶ。）
 
-   zip内の`data/`フォルダの中身（`tweets*.js`、`account.js`/`profile.js`、`tweets_media/`など）をまるごと`data/archive/data/`に展開し、続けて`ingest.py`を自動実行する。展開だけ行いたい場合は`--no-ingest`を付ける。
+   zip内の`data/`フォルダの中身（`tweets*.js`、`like.js`、`account.js`/`profile.js`、`tweets_media/`など）をまるごと`data/archive/data/`に展開し、続けて`ingest.py`/`ingest_likes.py`を自動実行する。展開だけ行いたい場合は`--no-ingest`を付ける。
    `id`（ツイートID）をprimary keyにしているため、再実行しても重複せず上書きされる（冪等）。
 
 アーカイブを再ダウンロード・更新した場合も、同じコマンドをもう一度実行すればよい（`write_web_config.py`は`account.js`が変わらない限り再実行不要）。
@@ -51,12 +51,13 @@ docker compose run --rm tools python scripts/write_web_config.py
 
 http://localhost:8080 を開くと、検索語なしでも最新50件のツイートがそのまま表示される。検索語を入れると絞り込み検索になる。
 
+- **ツイート / いいね タブ**: 自分の投稿と、いいねしたツイート（他人の投稿なので著者名・メディア・カウントはアーカイブに残っておらず未表示）を別々に検索できる。いいねの投稿日時はタイムスタンプが無いためツイートID（Snowflake ID）から逆算している
 - 下までスクロールすると次の結果を自動で読み込む（無限スクロール）
-- **並び替え**: 関連度 / 新しい順 / 古い順 / いいね数順（検索語なしの一覧表示では「関連度」は自動的に「新しい順」として扱われる）
-- **リツイートを除外**: チェックボックス
+- **並び替え**: 関連度 / 新しい順 / 古い順 / いいね数順（いいねタブには無い。検索語なしの一覧表示では「関連度」は自動的に「新しい順」として扱われる）
+- **リツイートを除外・メディアのみ**: チェックボックス（ツイートタブのみ）
 - **日付範囲**: 「次の日付以降」「次の日付以前」で絞り込み
 - 検索語を`"完全一致"`のように`"`で囲むと、語順固定・タイポ非許容のフレーズ検索になる（Meilisearchの標準構文）
-- 検索結果には画像・動画（ローカル保存分）とハッシュタグ、いいね/リツイート数を表示
+- 検索結果には画像・動画（ローカル保存分）とハッシュタグ、いいね/リツイート数を表示（ツイートタブのみ）
 - 各ツイートの「開く」リンクは元のX（twitter.com）のパーマリンクに遷移
 
 デバッグ用に以下も使える:
@@ -74,9 +75,10 @@ docker-compose.yml            meilisearch + web + tools の3サービス
 .env.example                   上記のテンプレート
 scripts/Dockerfile             toolsサービスのイメージ（meilisearch/python-dotenvを導入）
 scripts/requirements.txt       上記が入れる依存パッケージ
-scripts/configure_index.py     インデックス設定（検索対象/絞り込み対象の属性、タイポ耐性）を適用
-scripts/extract_archive.py     Xの archive zip の data/ を data/archive/data/ に展開し、続けて ingest.py を実行（stdlibのみ、python3で直接実行可）
-scripts/ingest.py              アーカイブのtweets*.jsをパースしてMeilisearchに投入。メディアのローカルファイル名も解決
+scripts/configure_index.py     tweets/likes 2つのインデックス設定（検索対象/絞り込み対象の属性、タイポ耐性）を適用
+scripts/extract_archive.py     Xの archive zip の data/ を data/archive/data/ に展開し、続けて ingest.py / ingest_likes.py を実行（stdlibのみ、python3で直接実行可）
+scripts/ingest.py              アーカイブのtweets*.jsをパースしてMeilisearchのtweetsインデックスに投入。メディアのローカルファイル名も解決
+scripts/ingest_likes.py        アーカイブのlike*.jsをパースしてMeilisearchのlikesインデックスに投入。投稿日時はツイートIDから逆算
 scripts/write_web_config.py    検索専用APIキー＋アカウント表示名＋アバターファイル名をweb/config.jsに書き出し
 scripts/search.py              動作確認用の簡易CLI検索
 web/index.html                 検索ページ本体（ビルド不要の単一HTML）
@@ -92,6 +94,7 @@ data/archive/                  展開済みアーカイブの配置場所（giti
   - 同様の例: 「渋谷」単独では0件になるが、「渋谷で」なら「渋谷」「で」が別トークンとして正しくヒットする。さらに「渋」（1文字）だけで検索すると「渋谷」を含むツイートがヒットすることもある（前方一致で「渋谷」トークンの先頭部分にマッチするため）。一方「東京」は同じ2文字の地名でも単独で問題なくヒットする、というように単語ごとに挙動が異なり法則性はない。
 - 280文字を超える長文ツイート（X「メモ」機能、`note-tweet.js`）は未対応。
 - `ingest.py`は`tweets*.js`をストリーミングせず、ファイル全体を`read_text()`で読んでから`json.loads()`で一括パースする（`scripts/ingest.py`の`parse_tweet_files`）。手元の41227ツイート（tweets.js 66MB）で数百MB程度のメモリを使う計算になるが、現代のPCなら問題ないレベル。一方、メディアファイル（画像・動画）の展開（`extract_archive.py`）はストリーミングコピーなのでメモリには乗らない。
+- いいねの「開く」リンクは著者のユーザー名が分からない（アーカイブに含まれない）ため、`https://twitter.com/i/web/status/{id}`という汎用リダイレクト形式のまま。自分のツイートで踏んだ「Xアプリのディープリンクがこの形式を解決できない」問題と同じ制約が残る。
 
 ## ライセンス
 
