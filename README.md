@@ -31,17 +31,14 @@ uv run scripts/write_web_config.py
 ## アーカイブの取り込み
 
 1. Xの「設定とプライバシー」→「アーカイブをダウンロード」からzipを取得
-2. zipを展開し、`data/`フォルダの中身を `data/archive/data/` に配置する
-   - 最低限 `tweets*.js`（`tweets.js` または `tweets-part1.js` など）が必要
-   - プロフィール表示用に `account.js` / `profile.js` もあると尚良い
-   - 画像・動画をオフライン表示したい場合は `tweets_media/` フォルダも配置する
-3. 投入を実行:
+2. zipを指定するだけで展開〜投入まで自動実行:
    ```bash
-   uv run scripts/ingest.py --archive-dir data/archive/data
+   uv run scripts/extract_archive.py path/to/twitter-archive.zip
    ```
+   zip内の`data/`フォルダの中身（`tweets*.js`、`account.js`/`profile.js`、`tweets_media/`など）をまるごと`data/archive/data/`に展開し、続けて`ingest.py`を自動実行する。展開だけ行いたい場合は`--no-ingest`を付ける。
    `id`（ツイートID）をprimary keyにしているため、再実行しても重複せず上書きされる（冪等）。
 
-アーカイブを再ダウンロード・更新した場合は、上記2〜3をやり直せばよい（`write_web_config.py`は`account.js`が変わらない限り再実行不要）。
+アーカイブを再ダウンロード・更新した場合も、同じコマンドをもう一度実行すればよい（`write_web_config.py`は`account.js`が変わらない限り再実行不要）。
 
 ## 使い方
 
@@ -69,6 +66,7 @@ docker-compose.yml           meilisearch + web の2サービス
 .env                          MEILI_MASTER_KEY 等（gitignore対象）
 .env.example                  上記のテンプレート
 scripts/configure_index.py    インデックス設定（検索対象/絞り込み対象の属性、タイポ耐性）を適用
+scripts/extract_archive.py    Xの archive zip の data/ を data/archive/data/ に展開し、続けて ingest.py を実行
 scripts/ingest.py             アーカイブのtweets*.jsをパースしてMeilisearchに投入。メディアのローカルファイル名も解決
 scripts/write_web_config.py   検索専用APIキー＋アカウント表示名をweb/config.jsに書き出し
 scripts/search.py             動作確認用の簡易CLI検索
