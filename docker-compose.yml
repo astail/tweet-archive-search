@@ -24,5 +24,19 @@ services:
     depends_on:
       - meilisearch
 
+  # Not started by `docker compose up`; invoke via `docker compose run --rm tools python scripts/<name>.py ...`
+  tools:
+    build: ./scripts
+    env_file:
+      - .env
+    environment:
+      MEILI_HOST: http://meilisearch:7700
+    volumes:
+      - .:/app
+    depends_on:
+      - meilisearch
+    profiles:
+      - tools
+
 volumes:
   meili_data:

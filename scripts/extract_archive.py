@@ -5,9 +5,11 @@
 restart the 'web' container (its tweets_media bind mount can go stale after
 the directory is replaced), then (by default) run ingest.py against it.
 
+Only uses the stdlib, so no uv/pip install needed - just Python 3.11+.
+
 Usage:
-    uv run scripts/extract_archive.py path/to/twitter-archive.zip
-    uv run scripts/extract_archive.py path/to/twitter-archive.zip --no-ingest
+    python3 scripts/extract_archive.py path/to/twitter-archive.zip
+    python3 scripts/extract_archive.py path/to/twitter-archive.zip --no-ingest
 """
 
 import argparse
@@ -85,7 +87,11 @@ def main():
 
     if not args.no_ingest:
         subprocess.run(
-            ["uv", "run", str(ROOT / "scripts" / "ingest.py"), "--archive-dir", str(TARGET)],
+            [
+                "docker", "compose", "run", "--rm", "tools",
+                "python", "scripts/ingest.py", "--archive-dir", "data/archive/data",
+            ],
+            cwd=ROOT,
             check=True,
         )
 
