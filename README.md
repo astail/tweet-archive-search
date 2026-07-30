@@ -77,11 +77,12 @@ scripts/requirements.txt       上記が入れる依存パッケージ
 scripts/configure_index.py     インデックス設定（検索対象/絞り込み対象の属性、タイポ耐性）を適用
 scripts/extract_archive.py     Xの archive zip の data/ を data/archive/data/ に展開し、続けて ingest.py を実行（stdlibのみ、python3で直接実行可）
 scripts/ingest.py              アーカイブのtweets*.jsをパースしてMeilisearchに投入。メディアのローカルファイル名も解決
-scripts/write_web_config.py    検索専用APIキー＋アカウント表示名をweb/config.jsに書き出し
+scripts/write_web_config.py    検索専用APIキー＋アカウント表示名＋アバターファイル名をweb/config.jsに書き出し
 scripts/search.py              動作確認用の簡易CLI検索
 web/index.html                 検索ページ本体（ビルド不要の単一HTML）
 web/config.js                  生成物。検索専用キー等（gitignore対象）
 web/media/                     tweets_mediaのマウントポイント（空、docker composeで自動マウント）
+web/profile/                   profile_media（アバター/ヘッダー画像）のマウントポイント（空、docker composeで自動マウント）
 data/archive/                  展開済みアーカイブの配置場所（gitignore対象、.gitkeepのみ管理下）
 ```
 

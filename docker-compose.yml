@@ -21,6 +21,7 @@ services:
     volumes:
       - ./web:/usr/share/nginx/html:ro
       - ./data/archive/data/tweets_media:/usr/share/nginx/html/media:ro
+      - ./data/archive/data/profile_media:/usr/share/nginx/html/profile:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - meilisearch

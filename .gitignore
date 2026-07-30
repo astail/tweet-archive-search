@@ -4,5 +4,7 @@ data/archive/*
 !data/archive/.gitkeep
 web/media/*
 !web/media/.gitkeep
+web/profile/*
+!web/profile/.gitkeep
 __pycache__/
 *.pyc

@@ -46,9 +46,21 @@ def read_account_info():
     archive_data = ROOT / "data" / "archive" / "data"
     account_path = archive_data / "account.js"
     if not account_path.exists():
-        return None, None
+        return None, None, None
     account = load_archive_js(account_path)[0]["account"]
-    return account.get("accountDisplayName"), account.get("username")
+    return account.get("accountDisplayName"), account.get("username"), account.get("accountId")
+
+
+def read_avatar_filename(account_id: str | None) -> str | None:
+    profile_path = ROOT / "data" / "archive" / "data" / "profile.js"
+    if not account_id or not profile_path.exists():
+        return None
+    avatar_url = load_archive_js(profile_path)[0]["profile"].get("avatarMediaUrl")
+    if not avatar_url:
+        return None
+    # Matches how the archive names extracted profile_media files: "{accountId}-{basename_of_url}".
+    basename = urllib.parse.urlparse(avatar_url).path.rsplit("/", 1)[-1]
+    return f"{account_id}-{basename}"
 
 
 def main():
@@ -70,13 +82,15 @@ def main():
         if k.get("actions") == ["search"] and k.get("indexes") in (["*"], ["tweets"])
     )
 
-    display_name, username = read_account_info()
+    display_name, username, account_id = read_account_info()
+    avatar_filename = read_avatar_filename(account_id)
 
     lines = [
         f'const MEILI_PORT = "{port}";',
         f'const MEILI_SEARCH_KEY = "{search_key}";',
         f"const ARCHIVE_DISPLAY_NAME = {json.dumps(display_name)};",
         f"const ARCHIVE_USERNAME = {json.dumps(username)};",
+        f"const ARCHIVE_AVATAR_FILENAME = {json.dumps(avatar_filename)};",
     ]
     config_path = ROOT / "web" / "config.js"
     config_path.write_text("\n".join(lines) + "\n")
