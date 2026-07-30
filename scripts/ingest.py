@@ -66,6 +66,17 @@ def extract_media(tweet: dict) -> list[dict]:
     return media
 
 
+def read_username(archive_dir: Path) -> str | None:
+    account_path = archive_dir / "account.js"
+    if not account_path.exists():
+        return None
+    text = account_path.read_text(encoding="utf-8")
+    json_text = JS_PREFIX_RE.sub("", text, count=1).strip()
+    if json_text.endswith(";"):
+        json_text = json_text[:-1]
+    return json.loads(json_text)[0]["account"].get("username")
+
+
 def parse_tweet_files(archive_dir: Path):
     files = sorted(archive_dir.glob("tweets*.js"))
     if not files:
@@ -80,12 +91,14 @@ def parse_tweet_files(archive_dir: Path):
             yield entry["tweet"]
 
 
-def normalize(tweet: dict) -> dict:
+def normalize(tweet: dict, username: str | None) -> dict:
     full_text = tweet.get("full_text") or tweet.get("text", "")
     created_at = email.utils.parsedate_to_datetime(tweet["created_at"])
     entities = tweet.get("entities", {})
     hashtags = [h["text"] for h in entities.get("hashtags", [])]
     urls = [u.get("expanded_url") for u in entities.get("urls", [])]
+    # Canonical form, not the /i/web/status/ redirect: the X app's deep-link routing doesn't resolve that on tap.
+    base = f"https://x.com/{username}" if username else "https://twitter.com/i/web"
     return {
         "id": tweet["id_str"],
         "full_text": full_text,
@@ -97,7 +110,7 @@ def normalize(tweet: dict) -> dict:
         "hashtags": hashtags,
         "urls": urls,
         "is_retweet": full_text.startswith("RT @"),
-        "permalink": f"https://twitter.com/i/web/status/{tweet['id_str']}",
+        "permalink": f"{base}/status/{tweet['id_str']}",
         "media": extract_media(tweet),
     }
 
@@ -129,8 +142,9 @@ def main():
     client = meilisearch.Client(host, master_key)
     index = client.index("tweets")
 
+    username = read_username(args.archive_dir)
     total = 0
-    docs = (normalize(t) for t in parse_tweet_files(args.archive_dir))
+    docs = (normalize(t, username) for t in parse_tweet_files(args.archive_dir))
     for batch in batched(docs, BATCH_SIZE):
         task = index.add_documents(batch, primary_key="id")
         client.wait_for_task(task.task_uid)
