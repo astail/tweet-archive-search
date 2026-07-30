@@ -369,6 +369,17 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// permalink comes straight from the archive JSON (tweets.js/like.js), so
+// treat it as untrusted: only allow http(s) and escape it as an attribute.
+function safeUrl(u) {
+  try {
+    const parsed = new URL(u, window.location.href);
+    return (parsed.protocol === "http:" || parsed.protocol === "https:") ? parsed.href : "#";
+  } catch {
+    return "#";
+  }
+}
+
 // Meilisearch's highlight markers are plain <em>...</em>; escape everything
 // else, then re-enable just those tags.
 function renderHighlighted(formatted) {
@@ -497,7 +508,7 @@ function renderTweet(hit) {
         <div class="tweet-actions">
           <span class="action">${RETWEET_ICON} ${hit.retweet_count}</span>
           <span class="action">${HEART_ICON} ${hit.favorite_count}</span>
-          <a class="action" href="${hit.permalink}" rel="noopener">${LINK_ICON} 開く</a>
+          <a class="action" href="${escapeHtml(safeUrl(hit.permalink))}" rel="noopener">${LINK_ICON} 開く</a>
         </div>
       </div>
     </div>
@@ -516,7 +527,7 @@ function renderLike(hit) {
         <div class="like-header">いいねしたツイート <span class="date">${date}</span></div>
         <p class="tweet-text">${text}</p>
         <div class="tweet-actions">
-          <a class="action" href="${hit.permalink}" rel="noopener">${LINK_ICON} 開く</a>
+          <a class="action" href="${escapeHtml(safeUrl(hit.permalink))}" rel="noopener">${LINK_ICON} 開く</a>
         </div>
       </div>
     </div>
