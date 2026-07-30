@@ -99,6 +99,7 @@ def normalize(tweet: dict, username: str | None) -> dict:
     urls = [u.get("expanded_url") for u in entities.get("urls", [])]
     # Canonical form, not the /i/web/status/ redirect: the X app's deep-link routing doesn't resolve that on tap.
     base = f"https://x.com/{username}" if username else "https://twitter.com/i/web"
+    media = extract_media(tweet)
     return {
         "id": tweet["id_str"],
         "full_text": full_text,
@@ -111,7 +112,8 @@ def normalize(tweet: dict, username: str | None) -> dict:
         "urls": urls,
         "is_retweet": full_text.startswith("RT @"),
         "permalink": f"{base}/status/{tweet['id_str']}",
-        "media": extract_media(tweet),
+        "media": media,
+        "has_media": bool(media),
     }
 
 

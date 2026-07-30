@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 SETTINGS = {
     "searchableAttributes": ["full_text", "hashtags"],
-    "filterableAttributes": ["lang", "is_retweet", "hashtags", "created_at_ts"],
+    "filterableAttributes": ["lang", "is_retweet", "has_media", "hashtags", "created_at_ts"],
     "sortableAttributes": ["created_at_ts", "favorite_count", "retweet_count"],
     "typoTolerance": {
         "enabled": True,

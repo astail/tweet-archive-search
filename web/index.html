@@ -207,6 +207,7 @@
     </div>
     <div class="filter-row">
       <label class="checkbox"><input type="checkbox" id="exclude-rt"> リツイートを除外</label>
+      <label class="checkbox"><input type="checkbox" id="media-only"> メディアのみ</label>
     </div>
     <div class="filter-row">
       <div class="date-range">
@@ -244,6 +245,7 @@ if (configReady && typeof ARCHIVE_USERNAME === "string" && ARCHIVE_USERNAME) {
 const qInput = document.getElementById("q");
 const sortPills = document.getElementById("sort-pills");
 const excludeRt = document.getElementById("exclude-rt");
+const mediaOnly = document.getElementById("media-only");
 const dateFrom = document.getElementById("date-from");
 const dateTo = document.getElementById("date-to");
 const resultsEl = document.getElementById("results");
@@ -292,6 +294,7 @@ function renderHighlighted(formatted) {
 function buildFilter() {
   const clauses = [];
   if (excludeRt.checked) clauses.push("is_retweet = false");
+  if (mediaOnly.checked) clauses.push("has_media = true");
   if (dateFrom.value) {
     const ts = Math.floor(new Date(dateFrom.value + "T00:00:00").getTime() / 1000);
     clauses.push(`created_at_ts >= ${ts}`);
@@ -424,6 +427,7 @@ sortPills.addEventListener("click", (e) => {
   runSearch();
 });
 excludeRt.addEventListener("change", runSearch);
+mediaOnly.addEventListener("change", runSearch);
 dateFrom.addEventListener("change", runSearch);
 dateTo.addEventListener("change", runSearch);
 window.addEventListener("scroll", () => {
