@@ -91,8 +91,32 @@ def parse_tweet_files(archive_dir: Path):
             yield entry["tweet"]
 
 
+def clean_text(tweet: dict, full_text: str) -> str:
+    """Expand t.co links to their real destinations and drop the t.co link
+    that just points at the tweet's own attached media (we render that
+    separately, and for media-only tweets it's otherwise the entire text).
+
+    Doing this at ingest time rather than in the browser also means search
+    matches the real URLs, so e.g. "github.com" finds tweets linking there.
+    """
+    entities = tweet.get("entities", {})
+    for u in entities.get("urls", []):
+        if u.get("url") and u.get("expanded_url"):
+            full_text = full_text.replace(u["url"], u["expanded_url"])
+    media_items = (
+        tweet.get("extended_entities", {}).get("media")
+        or entities.get("media")
+        or []
+    )
+    for m in media_items:
+        if m.get("url"):
+            full_text = full_text.replace(m["url"], "")
+    return full_text.strip()
+
+
 def normalize(tweet: dict, username: str | None) -> dict:
-    full_text = tweet.get("full_text") or tweet.get("text", "")
+    raw_text = tweet.get("full_text") or tweet.get("text", "")
+    full_text = clean_text(tweet, raw_text)
     created_at = email.utils.parsedate_to_datetime(tweet["created_at"])
     entities = tweet.get("entities", {})
     hashtags = [h["text"] for h in entities.get("hashtags", [])]

@@ -166,6 +166,8 @@
   .tweet-head .date { color: var(--muted); font-size: 0.85rem; }
   .tweet-text { white-space: pre-wrap; word-break: break-word; line-height: 1.45; margin: 0.15rem 0 0.4rem; font-size: 0.95rem; }
   .tweet-text em { font-style: normal; background: color-mix(in srgb, gold 45%, transparent); border-radius: 3px; padding: 0 2px; }
+  .text-link { color: var(--accent); text-decoration: none; }
+  .text-link:hover { text-decoration: underline; }
   .tweet-actions { display: flex; gap: 1.5rem; margin-top: 0.35rem; }
   .tweet-actions .action { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.82rem; }
   .tweet-actions svg { width: 17px; height: 17px; }
@@ -380,13 +382,31 @@ function safeUrl(u) {
   }
 }
 
+// Runs on already-escaped HTML, so `"` is &quot; and can't break out of the
+// href, and the pattern itself only ever matches http(s). The character class
+// is ASCII URL characters only, so Japanese text running straight into a URL
+// (common, since there's no space before 「。」) doesn't get swallowed into the
+// link; it also stops at `<`, leaving <em> highlight tags intact. Trailing
+// punctuation is trimmed back off since it's usually sentence punctuation.
+const URL_RE = /https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/g;
+function linkifyUrls(html) {
+  return html.replace(URL_RE, (match) => {
+    const trailing = match.match(/(?:&(?:amp|quot|#39|lt|gt);|[.,;:!?)\]}）」、。])+$/);
+    const url = trailing ? match.slice(0, -trailing[0].length) : match;
+    const tail = trailing ? trailing[0] : "";
+    if (!url) return match;
+    return `<a href="${url}" rel="noopener" class="text-link">${url}</a>${tail}`;
+  });
+}
+
 // Meilisearch's highlight markers are plain <em>...</em>; escape everything
 // else, then re-enable just those tags.
 function renderHighlighted(formatted) {
   const escaped = escapeHtml(formatted);
-  return escaped
+  const withHighlights = escaped
     .replaceAll("&lt;em&gt;", "<em>")
     .replaceAll("&lt;/em&gt;", "</em>");
+  return linkifyUrls(withHighlights);
 }
 
 function buildFilter(isLikes) {
