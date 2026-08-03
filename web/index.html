@@ -174,7 +174,8 @@
   .tweet-actions a.action { text-decoration: none; }
   .tweet-actions a.action:hover { color: var(--accent); }
   .hashtags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem; }
-  .hashtag { font-size: 0.85rem; color: var(--accent); }
+  .hashtag { font-size: 0.85rem; color: var(--accent); text-decoration: none; }
+  .hashtag:hover { text-decoration: underline; }
 
   .like-header { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.8rem; margin-bottom: 0.35rem; }
   .like-header .date { margin-left: auto; }
@@ -545,7 +546,7 @@ function renderTweet(hit) {
     year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
   });
   const hashtags = (hit.hashtags || [])
-    .map(h => `<span class="hashtag">#${escapeHtml(h)}</span>`)
+    .map(h => `<a class="hashtag" href="https://x.com/hashtag/${encodeURIComponent(h)}" rel="noopener">#${escapeHtml(h)}</a>`)
     .join("");
   const displayName = (configReady && ARCHIVE_DISPLAY_NAME) || "Tweet Archive";
   const username = (configReady && ARCHIVE_USERNAME) || "";
