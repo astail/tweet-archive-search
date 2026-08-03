@@ -181,6 +181,8 @@
   .like-header .date { margin-left: auto; }
   .avatar.heart-avatar { background: #f91880; }
   .avatar.heart-avatar svg { width: 20px; height: 20px; }
+  .avatar.rt-avatar { background: #00ba7c; }
+  .avatar.rt-avatar svg { width: 20px; height: 20px; }
 
   .tweet-media {
     display: grid;
@@ -424,20 +426,36 @@ function safeUrl(u) {
   }
 }
 
+// URLs and hashtags are matched in ONE pass with a single alternation, so
+// neither can match inside the other's output: a URL's own #fragment is
+// already consumed by the URL branch, and nothing rescans the hrefs we emit.
+//
 // Runs on already-escaped HTML, so `"` is &quot; and can't break out of the
-// href, and the pattern itself only ever matches http(s). The character class
-// is ASCII URL characters only, so Japanese text running straight into a URL
-// (common, since there's no space before 「。」) doesn't get swallowed into the
-// link; it also stops at `<`, leaving <em> highlight tags intact. Trailing
-// punctuation is trimmed back off since it's usually sentence punctuation.
-const URL_RE = /https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/g;
-function linkifyUrls(html) {
-  return html.replace(URL_RE, (match) => {
-    const trailing = match.match(/(?:&(?:amp|quot|#39|lt|gt);|[.,;:!?)\]}）」、。])+$/);
-    const url = trailing ? match.slice(0, -trailing[0].length) : match;
-    const tail = trailing ? trailing[0] : "";
-    if (!url) return match;
-    return `<a href="${url}" rel="noopener" class="text-link">${url}</a>${tail}`;
+// href, and the URL branch only ever matches http(s). Its character class is
+// ASCII URL characters only, so Japanese running straight into a URL (common,
+// since there's no space before 「。」) isn't swallowed into the link; it also
+// stops at `<`, leaving <em> highlight tags intact. Trailing punctuation is
+// trimmed back off since it's usually sentence punctuation.
+const HASHTAG_CHARS = "A-Za-z0-9_\\u3040-\\u309f\\u30a0-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uff10-\\uff19\\uff21-\\uff3a\\uff41-\\uff5a\\uff66-\\uff9f";
+const LINKIFY_RE = new RegExp(
+  "(https?:\\/\\/[A-Za-z0-9\\-._~:\\/?#\\[\\]@!$&'()*+,;=%]+)" + `|#([${HASHTAG_CHARS}]+)`,
+  "g"
+);
+const TRAILING_RE = /(?:&(?:amp|quot|#39|lt|gt);|[.,;:!?)\]}）」、。])+$/;
+
+function linkifyText(html) {
+  return html.replace(LINKIFY_RE, (match, url, tag, offset, whole) => {
+    if (url) {
+      const trailing = url.match(TRAILING_RE);
+      const href = trailing ? url.slice(0, -trailing[0].length) : url;
+      const tail = trailing ? trailing[0] : "";
+      if (!href) return match;
+      return `<a href="${href}" rel="noopener" class="text-link">${href}</a>${tail}`;
+    }
+    // Not a hashtag if glued to a preceding word character (e.g. "C#").
+    const prev = whole[offset - 1];
+    if (prev && /[A-Za-z0-9_]/.test(prev)) return match;
+    return `<a class="hashtag" href="https://x.com/hashtag/${encodeURIComponent(tag)}" rel="noopener">#${tag}</a>`;
   });
 }
 
@@ -448,7 +466,7 @@ function renderHighlighted(formatted) {
   const withHighlights = escaped
     .replaceAll("&lt;em&gt;", "<em>")
     .replaceAll("&lt;/em&gt;", "</em>");
-  return linkifyUrls(withHighlights);
+  return linkifyText(withHighlights);
 }
 
 function buildFilter(isLikes) {
@@ -551,9 +569,13 @@ function renderTweet(hit) {
   const displayName = (configReady && ARCHIVE_DISPLAY_NAME) || "Tweet Archive";
   const username = (configReady && ARCHIVE_USERNAME) || "";
   const initial = displayName.trim()[0]?.toUpperCase() ?? "?";
-  const avatarHtml = AVATAR_URL
-    ? `<div class="avatar"><img src="${AVATAR_URL}" alt="" loading="lazy"></div>`
-    : `<div class="avatar">${escapeHtml(initial)}</div>`;
+  // Retweets are someone else's post, so don't front them with your own
+  // avatar - that reads as if you wrote it.
+  const avatarHtml = hit.is_retweet
+    ? `<div class="avatar rt-avatar" title="リツイート">${RETWEET_ICON}</div>`
+    : AVATAR_URL
+      ? `<div class="avatar"><img src="${AVATAR_URL}" alt="" loading="lazy"></div>`
+      : `<div class="avatar">${escapeHtml(initial)}</div>`;
   return `
     <div class="tweet">
       ${avatarHtml}
